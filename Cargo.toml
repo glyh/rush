@@ -1,0 +1,16 @@
+[package]
+name = "rush"
+version = "0.1.0"
+edition = "2018"
+
+[build-dependencies]
+lalrpop = "0.22.0"
+
+[dependencies]
+cranelift = "0.97.1"
+cranelift-jit = "0.97.1"
+cranelift-module = "0.97.1"
+cranelift-native = "0.97.1"
+lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
+lazy_static = "1.5.0"
+rpds = "1.1.0"

@@ -1,0 +1,105 @@
+// vim: set syntax=rust:
+
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::str::FromStr;
+
+use crate::frontend::ast::*;
+use crate::types::Type;
+
+
+grammar;
+
+ExpTierLeft<Op, NextTier>: Box<Expr> = {
+    ExpTierLeft<Op,NextTier> Op NextTier => Box::new(Expr::Binary(<>)),
+    NextTier
+};
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None=> v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+pub Program: Program = {
+    <Item*> => Program { items: <> },
+}
+
+Item: Item = {
+    FunctionDef => Item::Function(<>),
+    VarDecl => Item::VarDecl(<>)
+};
+
+Type: Rc<RefCell<Type>> = {
+    "(" <Type> ")",
+    "fn" "(" <args: Comma<Type>> ")" "->" <returned: Type> => 
+        Rc::new(RefCell::new(Type::Function(args, returned))),
+    Ident => Rc::new(RefCell::new(Type::Con(<>.into())))
+}
+
+VarDecl: VarDecl = {
+     <name:Ident> ":" <_type:Type> "=" <value:Expr> ";" => VarDecl { name, value, _type },
+     <name:Ident> ":" "=" <value:Expr> ";" => VarDecl { name, value, _type: Rc::new(RefCell::new(Type::unknown())) }
+};
+
+
+Param: Param = {
+    Ident => Param { name: <>, _type: Rc::new(RefCell::new(Type::unknown())) },
+    <name: Ident> ":" <_type: Type> => Param { name, _type }
+}
+
+
+FunctionDef: FunctionDef = {
+    "fn" <name: Ident> "(" <params: Comma<Param>> ")"  <body:Block> => 
+        FunctionDef { name, params, body, return_type: Rc::new(RefCell::new(Type::unknown())) },
+    "fn" <name:Ident> "(" <params: Comma<Param>> ")" "->" <return_type:Type> <body:Block> => FunctionDef {
+        name, 
+        params,
+        body,
+        return_type: return_type
+    }
+};
+
+Block: Vec<Stmt> = "{" <Stmt*> "}";
+
+Stmt: Stmt = {
+    VarDecl => Stmt::VarDecl(<>),
+    <Expr> ";" => Stmt::Expr(<>),
+    "return" <Expr> ";" => Stmt::Return(<>),
+    "if" "(" <cond: Expr> ")" <then_branch: Block> "else" <else_branch: Block> => Stmt::IfElse(cond, then_branch, else_branch),
+    "while" "(" <cond: Expr> ")" <body: Block> => Stmt::While(cond, body)
+
+};
+
+Expr = ExpTierLeft<ExprOp, Factor>;
+Factor = ExpTierLeft<FactorOp, Term>;
+
+ExprOp: OpCode = {
+    "+" => OpCode::Add,
+    "-" => OpCode::Sub,
+};
+
+FactorOp: OpCode = {
+    "*" => OpCode::Mul,
+    "/" => OpCode::Div,
+};
+
+Term: Box<Expr> = {
+    Ident => Box::new(Expr::Var(<>)),
+    Atom => Box::new(Expr::Atom(<>)),
+    "(" <Expr> ")", 
+};
+
+Atom: Box<Atom> = {
+    r"[0-9]+" => Box::new(Atom::I32(i32::from_str(<>).unwrap())),
+    "true" => Box::new(Atom::Bool(true)),
+    "false" => Box::new(Atom::Bool(false)),
+}
+
+Ident: String = {
+    r"[a-zA-Z_][a-zA-Z0-9_]*" => String::from(<>)
+};
