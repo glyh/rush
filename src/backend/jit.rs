@@ -197,6 +197,11 @@ impl JIT {
 
         trans.translate_stmts(&fun.body);
         trans.builder.finalize();
+        let flags = settings::Flags::new(settings::builder());
+        if let Err(err) = codegen::verify_function(&self.ctx.func, &flags) {
+            eprintln!("{:?}", &self.ctx.func);
+            eprintln!("{:?}", err);
+        }
 
         Ok(())
     }
@@ -342,7 +347,7 @@ impl<'a> FunctionTranslator<'a> {
         let condition_value = self.translate_expr(cond);
         let then_block = self.builder.create_block();
         let else_block = self.builder.create_block();
-        let merge_block = self.builder.create_block();
+        let mut merge_block = None;
 
         self.builder
             .ins()
@@ -352,7 +357,9 @@ impl<'a> FunctionTranslator<'a> {
         self.builder.seal_block(then_block);
         let stmt_state = self.translate_stmts(then_branch);
         if !stmt_state.reach_branching {
-            self.builder.ins().jump(merge_block, &[]);
+            let merge_block_inner = self.builder.create_block();
+            merge_block = Some(merge_block_inner);
+            self.builder.ins().jump(merge_block_inner, &[]);
         }
 
         self.builder.switch_to_block(else_block);
@@ -360,13 +367,28 @@ impl<'a> FunctionTranslator<'a> {
 
         let stmt_state = self.translate_stmts(else_branch);
         if !stmt_state.reach_branching {
-            self.builder.ins().jump(merge_block, &[]);
+            match merge_block {
+                None => {
+                    let merge_block_inner = self.builder.create_block();
+                    merge_block = Some(merge_block_inner);
+                    self.builder.ins().jump(merge_block_inner, &[]);
+                }
+                Some(blk) => {
+                    self.builder.ins().jump(blk, &[]);
+                }
+            };
         }
 
-        self.builder.switch_to_block(merge_block);
-        self.builder.seal_block(merge_block);
-        StmtState {
-            reach_branching: false,
+        if let Some(merge_block) = &merge_block {
+            self.builder.switch_to_block(*merge_block);
+            self.builder.seal_block(*merge_block);
+            StmtState {
+                reach_branching: false,
+            }
+        } else {
+            StmtState {
+                reach_branching: true,
+            }
         }
     }
 
