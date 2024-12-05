@@ -45,4 +45,8 @@ impl Type {
         *counter += 1;
         Type::Var(Rc::new(RefCell::new(TVar::Unresolved(*counter))))
     }
+
+    pub fn con(name: String) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Type::Con(name)))
+    }
 }

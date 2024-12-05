@@ -53,7 +53,7 @@ Param: Param = {
 }
 
 
-FunctionDef: FunctionDef = {
+pub FunctionDef: FunctionDef = {
     "fn" <name: Ident> "(" <params: Comma<Param>> ")"  <body:Block> => 
         FunctionDef { name, params, body, return_type: Rc::new(RefCell::new(Type::unknown())) },
     "fn" <name:Ident> "(" <params: Comma<Param>> ")" "->" <return_type:Type> <body:Block> => FunctionDef {
@@ -75,20 +75,28 @@ Stmt: Stmt = {
 
 };
 
-Expr = ExpTierLeft<ExprOp, Factor>;
-Factor = ExpTierLeft<FactorOp, Term>;
+Expr = ExpTierLeft<RelationOp, Expr1>;
+Expr1 = ExpTierLeft<AddOp, Expr2>;
+Expr2 = ExpTierLeft<MulOp, Term>;
 
-ExprOp: OpCode = {
+RelationOp: OpCode = {
+    "==" => OpCode::Equal,
+    "!=" => OpCode::NotEqual,
+};
+
+
+AddOp: OpCode = {
     "+" => OpCode::Add,
     "-" => OpCode::Sub,
 };
 
-FactorOp: OpCode = {
+MulOp: OpCode = {
     "*" => OpCode::Mul,
     "/" => OpCode::Div,
 };
 
 Term: Box<Expr> = {
+    <id: Ident> "(" <args: Comma<Expr>> ")"=> Box::new(Expr::Call(id, args)),
     Ident => Box::new(Expr::Var(<>)),
     Atom => Box::new(Expr::Atom(<>)),
     "(" <Expr> ")", 

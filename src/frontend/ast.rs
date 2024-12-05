@@ -65,11 +65,13 @@ pub enum OpCode {
     Div,
     Add,
     Sub,
+    Equal,
+    NotEqual,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    Call(String, Vec<Expr>),
+    Call(String, Vec<Box<Expr>>),
     Binary(Box<Expr>, OpCode, Box<Expr>),
     Atom(Box<Atom>),
     Var(String),

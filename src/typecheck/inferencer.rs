@@ -84,16 +84,12 @@ fn unify_one(c: Constraint, out: &mut VecDeque<Constraint>) {
     }
 }
 
-fn type_con(name: String) -> Rc<RefCell<Type>> {
-    Rc::new(RefCell::new(Type::Con(name)))
-}
-
 fn infer_atom(atom: &ast::Atom) -> Rc<RefCell<Type>> {
     use ast::Atom::*;
 
     match atom {
-        I32(_) => type_con("I32".into()),
-        Bool(_) => type_con("Bool".into()),
+        I32(_) => Type::con("I32".into()),
+        Bool(_) => Type::con("Bool".into()),
     }
 }
 
@@ -108,12 +104,19 @@ fn infer_expr(
     match expr {
         Binary(left, op, right) => match op {
             Add | Sub | Mul | Div => {
-                let i32_type = type_con("I32".into());
+                let i32_type = Type::con("I32".into());
                 let left_type = infer_expr(env, left, constraints);
                 let right_type = infer_expr(env, right, constraints);
                 constraints.push_back((left_type.clone(), right_type));
                 constraints.push_back((left_type, i32_type.clone()));
                 i32_type
+            }
+            Equal | NotEqual => {
+                let bool_type = Type::con("Bool".into());
+                let left_type = infer_expr(env, left, constraints);
+                let right_type = infer_expr(env, right, constraints);
+                constraints.push_back((left_type.clone(), right_type));
+                bool_type
             }
         },
         Atom(atom) => infer_atom(atom),
@@ -175,13 +178,13 @@ fn infer_stmt(
             let cond_type = infer_expr(env, &cond, constraints);
             infer_block(env, then_branch, constraints, returned_type.clone());
             infer_block(env, else_branch, constraints, returned_type);
-            let bool_type = type_con("Bool".into());
+            let bool_type = Type::con("Bool".into());
             constraints.push_back((cond_type, bool_type));
         }
         While(cond, body) => {
             let cond_type = infer_expr(env, &cond, constraints);
             infer_block(env, body, constraints, returned_type);
-            let bool_type = type_con("Bool".into());
+            let bool_type = Type::con("Bool".into());
             constraints.push_back((cond_type, bool_type));
         }
     }
@@ -204,6 +207,18 @@ fn infer_function_top(
         constraints,
         func_def.return_type.clone(),
     );
+}
+
+pub fn infer_type_func(func_def: &ast::FunctionDef) {
+    let mut constraints: VecDeque<Constraint> = VecDeque::new();
+
+    let mut env = TyEnv::new();
+
+    infer_function_top(&mut env, func_def, &mut constraints);
+
+    while let Some(c) = constraints.pop_front() {
+        unify_one(c, &mut constraints);
+    }
 }
 
 pub fn infer_type(prog: &ast::Program) {
