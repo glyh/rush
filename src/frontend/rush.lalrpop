@@ -4,11 +4,42 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
+use crate::frontend::tokens::{LexicalError, Token};
 use crate::frontend::ast::*;
 use crate::types::Type;
 
-
 grammar;
+
+extern {
+    type Location = usize;
+    type Error = LexicalError;
+
+    enum Token {
+        "fn" => Token::KwFn,
+        "return" => Token::KwReturn,
+        "if" => Token::KwIf,
+        "else" => Token::KwElse,
+        "while" => Token::KwWhile,
+        "identifier" => Token::Identifier(<String>), 
+        "Bool" => Token::Bool(<bool>),
+        "I32" => Token::I32(<i32>),
+        ","=> Token::Comma,
+        ";"=> Token::Semicol,
+        "("=> Token::LParen,
+        ")"=> Token::RParen,
+        "{"=> Token::LBrace,
+        "}"=> Token::RBrace,
+        "->" => Token::RArrow,
+        ":" => Token::Colon,
+        "=" => Token::Assign,
+        "==" => Token::Eq,
+        "!=" => Token::Ne,
+        "+" => Token::Add,
+        "-" => Token::Sub,
+        "*" => Token::Mul,
+        "/" => Token::Div,
+    }
+}
 
 ExpTierLeft<Op, NextTier>: Box<Expr> = {
     ExpTierLeft<Op,NextTier> Op NextTier => Box::new(Expr::Binary(<>)),
@@ -38,25 +69,25 @@ Type: Rc<RefCell<Type>> = {
     "(" <Type> ")",
     "fn" "(" <args: Comma<Type>> ")" "->" <returned: Type> => 
         Rc::new(RefCell::new(Type::Function(args, returned))),
-    Ident => Rc::new(RefCell::new(Type::Con(<>.into())))
+    "identifier" => Rc::new(RefCell::new(Type::Con(<>.into())))
 }
 
 VarDecl: VarDecl = {
-     <name:Ident> ":" <_type:Type> "=" <value:Expr> ";" => VarDecl { name, value, _type },
-     <name:Ident> ":" "=" <value:Expr> ";" => VarDecl { name, value, _type: Rc::new(RefCell::new(Type::unknown())) }
+     <name:"identifier"> ":" <_type:Type> "=" <value:Expr> ";" => VarDecl { name, value, _type },
+     <name:"identifier"> ":" "=" <value:Expr> ";" => VarDecl { name, value, _type: Rc::new(RefCell::new(Type::unknown())) }
 };
 
 
 Param: Param = {
-    Ident => Param { name: <>, _type: Rc::new(RefCell::new(Type::unknown())) },
-    <name: Ident> ":" <_type: Type> => Param { name, _type }
+    "identifier" => Param { name: <>, _type: Rc::new(RefCell::new(Type::unknown())) },
+    <name: "identifier"> ":" <_type: Type> => Param { name, _type }
 }
 
 
 pub FunctionDef: FunctionDef = {
-    "fn" <name: Ident> "(" <params: Comma<Param>> ")"  <body:Block> => 
+    "fn" <name: "identifier"> "(" <params: Comma<Param>> ")"  <body:Block> => 
         FunctionDef { name, params, body, return_type: Rc::new(RefCell::new(Type::unknown())) },
-    "fn" <name:Ident> "(" <params: Comma<Param>> ")" "->" <return_type:Type> <body:Block> => FunctionDef {
+    "fn" <name:"identifier"> "(" <params: Comma<Param>> ")" "->" <return_type:Type> <body:Block> => FunctionDef {
         name, 
         params,
         body,
@@ -96,18 +127,13 @@ MulOp: OpCode = {
 };
 
 Term: Box<Expr> = {
-    <id: Ident> "(" <args: Comma<Expr>> ")"=> Box::new(Expr::Call(id, args)),
-    Ident => Box::new(Expr::Var(<>)),
+    <id: "identifier"> "(" <args: Comma<Expr>> ")"=> Box::new(Expr::Call(id, args)),
+    "identifier" => Box::new(Expr::Var(<>)),
     Atom => Box::new(Expr::Atom(<>)),
     "(" <Expr> ")", 
 };
 
 Atom: Box<Atom> = {
-    r"[0-9]+" => Box::new(Atom::I32(i32::from_str(<>).unwrap())),
-    "true" => Box::new(Atom::Bool(true)),
-    "false" => Box::new(Atom::Bool(false)),
+    "I32" => Box::new(Atom::I32(<>)),
+    "Bool" => Box::new(Atom::Bool(<>)),
 }
-
-Ident: String = {
-    r"[a-zA-Z_][a-zA-Z0-9_]*" => String::from(<>)
-};

@@ -31,12 +31,13 @@ fn fib(n) {
             return fib(n - 1) + fib(n - 2);
         }
     }
-}
-"#;
+}"#;
+
+    let lexer = crate::frontend::lexer::Lexer::new(source);
 
     let prog_parser = crate::frontend::rush::FunctionDefParser::new();
 
-    let func_ast = prog_parser.parse(source).unwrap();
+    let func_ast = prog_parser.parse(lexer).unwrap();
     crate::typecheck::inferencer::infer_type_func(&func_ast);
 
     let mut jit = jit::JIT::default();

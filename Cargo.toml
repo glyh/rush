@@ -13,3 +13,4 @@ cranelift-module = "0.114.0"
 cranelift-native = "0.114.0"
 lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
 lazy_static = "1.5.0"
+logos = "0.14.3"

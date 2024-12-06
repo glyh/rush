@@ -1,6 +1,8 @@
 use lalrpop_util::lalrpop_mod;
 
 pub mod ast;
+pub mod lexer;
+pub mod tokens;
 
 lalrpop_mod!(
     pub rush, "/frontend/rush.rs"
@@ -15,10 +17,12 @@ fn rush_parse() {
     use crate::frontend::rush;
     use crate::types::*;
 
+    let source = "fn main() -> I32 { return 42; }";
+
+    let lexer = lexer::Lexer::new(source);
+
     let prog_parser = rush::ProgramParser::new();
-    let ast = prog_parser
-        .parse("fn main() -> I32 { return 42; }")
-        .unwrap();
+    let ast = prog_parser.parse(lexer).unwrap();
     assert_eq!(
         ast,
         Program {
